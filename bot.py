@@ -3,52 +3,66 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import json
 import os
+import time
 from datetime import datetime
 
-# GitHub Secrets থেকে ডেটা নেওয়া
+# কনফিগারেশন
 BOT_TOKEN = "8202203049:AAFoR-vtoNYZ2efSJBFb_Wb2VukWCXdRciA"
-FIREBASE_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT") # গিটহাব সিক্রেট থেকে আসবে
+FIREBASE_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT")
+ADMIN_ID = 8504263842
 
-# Firebase ইনিশিয়ালাইজেশন
-if FIREBASE_JSON:
-    cred_dict = json.loads(FIREBASE_JSON)
-    cred = credentials.Certificate(cred_dict)
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
-else:
-    print("Error: Firebase JSON not found in Secrets!")
-    exit()
+# Firebase সেটআপ
+try:
+    if FIREBASE_JSON:
+        cred_dict = json.loads(FIREBASE_JSON)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client()
+    else:
+        print("Firebase Secret not found!")
+        exit(1)
+except Exception as e:
+    print(f"Firebase Init Error: {e}")
+    exit(1)
 
 bot = telebot.TeleBot(BOT_TOKEN)
-ADMIN_ID = 8504263842
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    user = message.from_user
-    user_id = str(user.id)
-    
-    user_ref = db.collection('users').document(user_id)
-    doc = user_ref.get()
+    try:
+        user = message.from_user
+        user_id = str(user.id)
+        user_ref = db.collection('users').document(user_id)
+        doc = user_ref.get()
 
-    if doc.exists:
-        data = doc.to_dict()
-        bot.reply_to(message, f"স্বাগতম বন্ধু {user.first_name}! তোমার তথ্য আগে থেকেই সেভ আছে।")
-    else:
-        user_data = {
-            'id': user.id,
-            'name': user.first_name,
-            'username': user.username,
-            'joined_at': datetime.now()
-        }
-        user_ref.set(user_data)
-        bot.reply_to(message, "তুমি আমাদের বটে নতুন! তোমার তথ্য Firebase-এ স্থায়ীভাবে সেভ করা হলো।")
+        if doc.exists:
+            bot.reply_to(message, f"স্বাগতম বন্ধু {user.first_name}! তুমি অলরেডি রেজিস্টার্ড।")
+        else:
+            user_data = {
+                'id': user.id,
+                'name': user.first_name,
+                'username': user.username,
+                'joined_at': datetime.now()
+            }
+            user_ref.set(user_data)
+            bot.reply_to(message, "সফলভাবে Firebase-এ তোমার তথ্য সেভ করা হয়েছে!")
+    except Exception as e:
+        print(f"Error in start command: {e}")
 
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
     if message.from_user.id == ADMIN_ID:
-        bot.reply_to(message, "হ্যালো এডমিন Dark Unknown! বট সচল আছে।")
-    else:
-        bot.reply_to(message, "দুঃখিত, এটি শুধুমাত্র এডমিনের জন্য।")
+        bot.reply_to(message, "এডমিন প্যানেল সচল আছে বন্ধু!")
 
-print("বট চলছে...")
-bot.infinity_polling()
+# বট রান করার ফাংশন (লুপ সহ)
+def run_bot():
+    print("বট স্টার্ট হচ্ছে...")
+    while True:
+        try:
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            print(f"বট ক্রাশ করেছে: {e}. ৫ সেকেন্ড পর আবার চেষ্টা করছি...")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    run_bot()
