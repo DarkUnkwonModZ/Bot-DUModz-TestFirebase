@@ -1,0 +1,33 @@
+name: Telegram Bot Runner
+
+on:
+  schedule:
+    - cron: "0 */4 * * *" # প্রতি ৪ ঘণ্টা পর পর চলবে
+  workflow_dispatch: # ম্যানুয়ালি স্টার্ট করার জন্য
+
+# আগের প্রসেস বন্ধ করার জন্য concurrency ব্যবহার করা হয়েছে
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Bot
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python bot.py
